@@ -3,9 +3,12 @@ from pathlib import Path
 import subprocess
 p=argparse.ArgumentParser()
 p.add_argument("--engine", choices=["chatterbox","piper"], required=True)
+p.add_argument('--text-file')
+p.add_argument('--tempo', type=float, default=0.8075)
 a=p.parse_args()
 out=Path("output"); out.mkdir(exist_ok=True)
 text="Zbliżasz się do przejścia dla pieszych. Zachowaj szczególną ostrożność i zmniejsz prędkość, aby nie narazić na niebezpieczeństwo pieszego. Ustąp pierwszeństwa pieszemu znajdującemu się na przejściu albo wchodzącemu na nie. Gdy pieszy bezpiecznie opuści twój tor jazdy, upewnij się, że możesz ruszyć. Pamiętaj, bezpieczeństwo jest ważniejsze niż pośpiech."
+if a.text_file: text=Path(a.text_file).read_text(encoding="utf-8").strip()
 wav=out/(a.engine+".wav")
 if a.engine=="chatterbox":
     import torch
@@ -22,6 +25,6 @@ else:
     with wave.open(str(wav),"wb") as f:
         voice.synthesize_wav(text,f)
 slow=out/(a.engine+"_slow.wav")
-subprocess.run(["ffmpeg","-y","-i",str(wav),"-af","atempo=0.85,loudnorm=I=-16:TP=-1.5:LRA=11","-c:a","pcm_s16le",str(slow)],check=True)
+subprocess.run(["ffmpeg","-y","-i",str(wav),"-af",f"atempo={a.tempo},loudnorm=I=-16:TP=-1.5:LRA=11","-c:a","pcm_s16le",str(slow)],check=True)
 slow.replace(wav)
 subprocess.run(["ffmpeg","-y","-i",str(wav),"-codec:a","libmp3lame","-b:a","192k",str(out/(a.engine+".mp3"))],check=True)
