@@ -1,0 +1,52 @@
+name: Three.js instructional video
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'three/**'
+      - '.github/workflows/three-video.yml'
+permissions:
+  contents: read
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg libsndfile1
+          npm install --no-save three@0.170.0 playwright@1.51.1
+          npx playwright install --with-deps chromium
+      - name: Fetch demonstration assets
+        run: |
+          mkdir -p assets rendered
+          curl -fL --retry 3 https://raw.githubusercontent.com/mrdoob/three.js/r170/examples/models/gltf/Soldier.glb -o assets/Soldier.glb
+          curl -fL --retry 3 https://raw.githubusercontent.com/mrdoob/three.js/r170/examples/models/gltf/ferrari.glb -o assets/ferrari.glb
+      - name: Render scene
+        run: |
+          python -m http.server 8000 --bind 127.0.0.1 > /tmp/prawko-http.log 2>&1 &
+          node three/render.mjs
+      - name: Generate narration
+        run: |
+          pip install chatterbox-tts
+          python scripts/voice.py --engine chatterbox
+      - name: Encode video
+        run: |
+          ffmpeg -y -framerate 24 -i frames/%04d.png -i output/chatterbox.mp3 -af apad -t 30 -c:v libx264 -preset fast -crf 20 -pix_fmt yuv420p -c:a aac -b:a 192k -movflags +faststart rendered/prawko_three.mp4
+          ffprobe -v error -show_format -show_streams rendered/prawko_three.mp4
+      - uses: actions/upload-artifact@v4
+        with:
+          name: three-driving-video
+          path: |
+            rendered/prawko_three.mp4
+            frames/0300.png
+          if-no-files-found: error
+          retention-days: 14
