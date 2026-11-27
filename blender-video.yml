@@ -1,0 +1,51 @@
+name: Blender driving video
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'blender/**'
+      - 'scripts/voice.py'
+      - '.github/workflows/blender-video.yml'
+permissions:
+  contents: read
+jobs:
+  render-video:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Blender, FFmpeg and audio deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y blender ffmpeg libsndfile1
+      - name: Install Chatterbox TTS
+        run: |
+          pip install chatterbox-tts
+      - name: Generate narration
+        run: python scripts/voice.py --engine chatterbox
+      - name: Prepare render folders
+        run: mkdir -p render_frames rendered
+      - name: Render Blender animation
+        run: |
+          blender -b -P blender/scene_pedestrian_crossing.py -a
+      - name: Mux video with narration
+        run: |
+          ffmpeg -y \
+            -framerate 24 -i render_frames/frame_%04d.png \
+            -i output/chatterbox.mp3 \
+            -c:v libx264 -pix_fmt yuv420p -preset medium -crf 20 \
+            -c:a aac -b:a 192k -shortest \
+            rendered/prawko_abc_blender_crossing.mp4
+      - name: Inspect final file
+        run: ffprobe -v error -show_format -show_streams rendered/prawko_abc_blender_crossing.mp4
+      - uses: actions/upload-artifact@v4
+        with:
+          name: blender-driving-video
+          path: |
+            rendered/prawko_abc_blender_crossing.mp4
+            output/chatterbox.mp3
+          if-no-files-found: error
+          retention-days: 14
