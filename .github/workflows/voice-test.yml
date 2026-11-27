@@ -1,0 +1,39 @@
+name: Polish neural voice test
+on:
+  push:
+    paths:
+      - 'scripts/voice.py'
+      - '.github/workflows/voice-test.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  voice:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        engine: [chatterbox, piper]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg libsndfile1
+      - if: matrix.engine == 'chatterbox'
+        run: |
+          pip install chatterbox-tts
+      - if: matrix.engine == 'piper'
+        run: |
+          pip install piper-tts
+          curl -fL --retry 3 https://huggingface.co/rhasspy/piper-voices/resolve/main/pl/pl_PL/darkman/medium/pl_PL-darkman-medium.onnx -o pl_PL-darkman-medium.onnx
+          curl -fL --retry 3 https://huggingface.co/rhasspy/piper-voices/resolve/main/pl/pl_PL/darkman/medium/pl_PL-darkman-medium.onnx.json -o pl_PL-darkman-medium.onnx.json
+      - run: python scripts/voice.py --engine ${{ matrix.engine }}
+      - run: ffprobe -v error -show_format -show_streams output/${{ matrix.engine }}.mp3
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Polish-${{ matrix.engine }}
+          path: output/
+          if-no-files-found: error
+          retention-days: 14
