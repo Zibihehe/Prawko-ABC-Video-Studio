@@ -1,0 +1,66 @@
+<!doctype html><html lang="pl"><meta charset="utf-8"><style>
+*{box-sizing:border-box}body{margin:0;background:#111;color:white;font:20px Arial;overflow:hidden}canvas{display:block}#brand,#hud,#caption{position:absolute;background:#142334ed;border-radius:9px;padding:10px 16px}#brand{top:18px;left:18px;font-weight:bold}#hud{top:18px;right:18px}#caption{bottom:18px;left:8%;right:8%;text-align:center;font-size:24px}
+</style><div id="brand">PRAWKO ABC • LEKCJA 02</div><div id="hud"></div><div id="caption"></div><script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js","three/addons/":"/node_modules/three/examples/jsm/"}}</script><script type="module">
+import * as T from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {DRACOLoader} from 'three/addons/loaders/DRACOLoader.js';
+import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
+const scene=new T.Scene();scene.background=new T.Color(0xb3c9dc);scene.fog=new T.Fog(0xb3c9dc,65,170);
+const camera=new T.PerspectiveCamera(53,16/9,.05,220);
+const r=new T.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});r.setSize(960,540);r.shadowMap.enabled=true;r.shadowMap.type=T.PCFSoftShadowMap;r.toneMapping=T.ACESFilmicToneMapping;r.toneMappingExposure=1.1;document.body.prepend(r.domElement);
+const pmrem=new T.PMREMGenerator(r);scene.environment=pmrem.fromScene(new RoomEnvironment(),.04).texture;scene.environmentIntensity=.55;
+scene.add(new T.HemisphereLight(0xf2f7ff,0x77745a,1.5));const sun=new T.DirectionalLight(0xffe9d0,2.6);sun.position.set(-16,28,15);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);Object.assign(sun.shadow.camera,{left:-27,right:27,top:27,bottom:-27,far:100});sun.shadow.bias=-.0003;scene.add(sun,sun.target);
+const mat=c=>new T.MeshStandardMaterial({color:c,roughness:.85});
+function box(x,y,z,w,h,d,m,p=scene){const o=new T.Mesh(new T.BoxGeometry(w,h,d),m);o.position.set(x,y,z);o.castShadow=o.receiveShadow=true;p.add(o);return o}
+const asphalt=mat(0x44474a),white=mat(0xecece5),pave=mat(0xa6a29a),grass=mat(0x6c8951),dark=mat(0x20252a);
+let seed=17;function rnd(){seed=(seed*1664525+1013904223)>>>0;return seed/4294967296}
+function texture(base,amplitude){const c=document.createElement('canvas');c.width=c.height=256;const g=c.getContext('2d');const a=g.createImageData(256,256);for(let i=0;i<a.data.length;i+=4){const q=Math.round(base+(rnd()-.5)*amplitude);a.data[i]=q;a.data[i+1]=q;a.data[i+2]=q;a.data[i+3]=255}g.putImageData(a,0,0);const t=new T.CanvasTexture(c);t.wrapS=t.wrapT=T.RepeatWrapping;t.repeat.set(16,16);t.colorSpace=T.SRGBColorSpace;return t}
+asphalt.map=texture(150,55);asphalt.color.setHex(0x86898b);
+box(0,-.15,0,160,.2,160,grass);box(0,-.04,0,7.4,.08,140,asphalt);box(0,-.038,0,140,.08,7.4,asphalt);
+for(const sx of [-1,1])for(const sz of [-1,1]){
+ box(sx*4.6,.08,sz*37.8,1.8,.16,64.4,pave);box(sx*37.8,.08,sz*4.6,64.4,.16,1.8,pave);
+ box(sx*4.6,.08,sz*4.6,1.8,.16,1.8,pave);
+}
+for(let d=-66;d<=66;d+=6)if(Math.abs(d)>8){box(0,.013,d,.09,.02,2.7,white);box(d,.013,0,2.7,.02,.09,white)}
+const glass=mat(0x536879),frame=mat(0xe2ddd4),roof=mat(0x665d56);
+for(const sx of [-1,1])for(const sz of [-1,1])for(let j=0;j<3;j++){
+ const x=sx*(11+10*j),z=sz*(12+8*j),h=5+2*(j%2),facade=mat([0xc3b5a3,0xd0c9bb,0xb0b8b8][j]);
+ box(x,h/2,z,7,h,7,facade);box(x,h+.13,z,7.4,.26,7.4,roof);
+ for(let floor=1.5;floor<h-.4;floor+=1.7)for(let k=-2.4;k<3;k+=1.6){
+ box(x+k,floor,z-sz*3.51,1.08,1.12,.06,frame);box(x+k,floor,z-sz*3.55,.86,.9,.05,glass);
+ box(x-sx*3.51,floor,z+k,.06,1.12,1.08,frame);box(x-sx*3.55,floor,z+k,.05,.9,.86,glass);}
+ const trunk=new T.Mesh(new T.CylinderGeometry(.13,.21,3,10),mat(0x71543a));trunk.position.set(sx*7,1.5,z);scene.add(trunk);
+ for(let k=0;k<4;k++){const crown=new T.Mesh(new T.IcosahedronGeometry(1.1+rnd()*.6,2),mat(0x4d753e));crown.position.set(sx*7+(rnd()-.5),3.1+k*.38,z+(rnd()-.5)*1.4);crown.castShadow=true;scene.add(crown)}
+}
+const draco=new DRACOLoader();draco.setDecoderPath('/node_modules/three/examples/jsm/libs/draco/gltf/');draco.setWorkerLimit(2);const loader=new GLTFLoader().setDRACOLoader(draco);
+const asset=await loader.loadAsync('/assets/ferrari.glb');
+// Identify front using named headlamps or front axle, then align canonical forward to -Z.
+const src=asset.scene;src.updateMatrixWorld(true);const front=[],rear=[];
+src.traverse(o=>{if(/wheel[_ .-]?f[lr]|headlamp|headlight|front[_ .-]?light/i.test(o.name))front.push(o.getWorldPosition(new T.Vector3()));if(/wheel[_ .-]?r[lr]|tail[_ .-]?light|rear[_ .-]?light/i.test(o.name))rear.push(o.getWorldPosition(new T.Vector3()))});
+const average=a=>a.reduce((v,p)=>v.add(p),new T.Vector3()).divideScalar(a.length);
+let forward=new T.Vector3(0,0,-1);if(front.length&&rear.length)forward=average(front).sub(average(rear));else console.warn('Vehicle front markers missing; using original model forward -Z');
+const align=-Math.PI/2-Math.atan2(forward.z,forward.x); // replaced below with direction-to-yaw formula
+function vehicle(color){
+ const root=new T.Group(),mesh=src.clone(true);mesh.rotation.y=Math.atan2(forward.x,-forward.z)*-1;root.add(mesh);mesh.updateMatrixWorld(true);
+ const b=new T.Box3().setFromObject(mesh);const size=b.getSize(new T.Vector3()),c=b.getCenter(new T.Vector3());const scale=4.5/Math.max(size.x,size.z);mesh.scale.multiplyScalar(scale);mesh.position.set(-c.x*scale,-b.min.y*scale,-c.z*scale);
+ mesh.traverse(o=>{if(o.isMesh){o.castShadow=o.receiveShadow=true;if(o.material){const recolor=m=>{const n=m.clone();if(/body|paint/i.test(m.name))n.color.setHex(color);return n};o.material=Array.isArray(o.material)?o.material.map(recolor):recolor(o.material)}}});
+ scene.add(root);return root;
+}
+const ego=vehicle(0x265d9b),other=vehicle(0xb1b8bf);
+const cabin=new T.Group();camera.add(cabin);scene.add(camera);box(0,-.51,-.76,1.75,.24,.65,dark,cabin);const wheel=new T.Mesh(new T.TorusGeometry(.19,.027,12,40),dark);wheel.position.set(-.26,-.34,-.62);wheel.rotation.x=-.3;cabin.add(wheel);
+const hud=document.getElementById('hud'),cap=document.getElementById('caption');
+const clamp=x=>Math.max(0,Math.min(1,x));
+window.frame=t=>{
+ // Right-hand traffic: ego travels north (-Z), other west (-X) in its right lane (+? west-facing right is north, -Z).
+ const a=clamp(t/7),b=clamp((t-18)/12);const ez=29-22*(2*a-a*a)-22*b*b;
+ const p=clamp((t-5)/12);const ox=23-48*p;ego.position.set(1.8,0,ez);ego.rotation.y=0;other.position.set(ox,0,-1.8);other.rotation.y=Math.PI/2;
+ ego.visible=false;cabin.visible=true;
+ camera.position.set(1.45,1.45,ez+.1);camera.lookAt(1.8,1.2,ez-15);
+ if(t>=8&&t<17){ego.visible=true;cabin.visible=false;camera.position.set(10,13,14);camera.lookAt(0,.3,0)}
+ hud.textContent=t<7?Math.round(22.63*(1-a))+' km/h • ZWOLNIJ':t<18?'0 km/h • USTĄP PIERWSZEŃSTWA':Math.round(13.2*b)+' km/h • RUSZ OSTROŻNIE';
+ cap.textContent=t<7?'Skrzyżowanie równorzędne: obserwuj drogę z prawej strony.':t<18?'Ustąp pojazdowi nadjeżdżającemu z prawej strony.':'Gdy droga jest wolna, możesz kontynuować jazdę.';
+ if(t>=7&&t<18&&ez<6.9)throw Error('Ego entered intersection too early');
+ if(t>=18&&ox>-7)throw Error('Cross traffic has not cleared');
+ r.render(scene,camera);
+};window.frame(0);window.ready=true;
+</script></html>
