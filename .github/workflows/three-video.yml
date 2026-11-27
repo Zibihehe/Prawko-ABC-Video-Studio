@@ -33,7 +33,25 @@ jobs:
       - name: Render scene
         run: |
           python -m http.server 8000 --bind 127.0.0.1 > /tmp/prawko-http.log 2>&1 &
-          node three/render.mjs
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          ready=0
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent --max-time 2 http://127.0.0.1:8000/three/ >/dev/null; then
+              ready=1
+              break
+            fi
+            if ! kill -0 "$server_pid" 2>/dev/null; then
+              cat /tmp/prawko-http.log
+              exit 1
+            fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then
+            cat /tmp/prawko-http.log
+            exit 1
+          fi
+          node three/render.mjs || { cat /tmp/prawko-http.log; exit 1; }
       - name: Generate narration
         run: |
           pip install chatterbox-tts
