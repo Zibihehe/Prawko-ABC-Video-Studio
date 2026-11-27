@@ -21,4 +21,7 @@ else:
     voice=PiperVoice.load("pl_PL-darkman-medium.onnx")
     with wave.open(str(wav),"wb") as f:
         voice.synthesize_wav(text,f)
-subprocess.run(["ffmpeg","-y","-i",str(wav),"-af","loudnorm=I=-16:TP=-1.5:LRA=11","-codec:a","libmp3lame","-b:a","192k",str(out/(a.engine+".mp3"))],check=True)
+slow=out/(a.engine+"_slow.wav")
+subprocess.run(["ffmpeg","-y","-i",str(wav),"-af","atempo=0.85,loudnorm=I=-16:TP=-1.5:LRA=11","-c:a","pcm_s16le",str(slow)],check=True)
+slow.replace(wav)
+subprocess.run(["ffmpeg","-y","-i",str(wav),"-codec:a","libmp3lame","-b:a","192k",str(out/(a.engine+".mp3"))],check=True)
